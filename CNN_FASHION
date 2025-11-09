@@ -44,3 +44,44 @@ history = model.fit(
     validation_data=(x_test, y_test), # Use test data for validation
     verbose=1
 )
+
+# 5. Evaluate the Model's Overall Accuracy
+print("\n--- Evaluating on test data ---")
+test_loss, test_acc = model.evaluate(x_test, y_test, verbose=2)
+print(f"\nOverall Test accuracy: {test_acc*100:.2f}%")
+
+# 6. Plot the Simple Accuracy Graph
+print("\n--- Plotting training history ---")
+plt.figure(figsize=(8, 5))
+plt.plot(history.history['accuracy'], label='Training Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.title('Model Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# 7. Test and Display 5 Sample Predictions
+print("\n--- Displaying individual predictions ---")
+
+predictions = model.predict(x_test[:5])
+predicted_labels = np.argmax(predictions, axis=1)
+actual_labels = y_test[:5]
+
+# Set up a 1x5 grid to display the images
+plt.figure(figsize=(10, 3))
+for i in range(5):
+    plt.subplot(1, 5, i + 1)
+    
+    # Display the image (reshape to 28x28)
+    plt.imshow(x_test[i].reshape(28, 28), cmap='gray')
+    
+    # Set the title with prediction and actual label
+    pred_name = class_names[predicted_labels[i]]
+    actual_name = class_names[actual_labels[i]]
+    plt.title(f"Pred: {pred_name}\nActual: {actual_name}")
+    plt.axis('off')
+
+plt.tight_layout()
+plt.show()
