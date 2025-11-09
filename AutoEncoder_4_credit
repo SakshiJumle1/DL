@@ -1,100 +1,88 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 import tensorflow as tf
+from tensorflow import keras
 import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score, precision_score, recall_score
+from sklearn.model_selection import train_test_split
+from tensorflow.keras import layers, models
+from sklearn.preprocessing import StandardScaler
 import seaborn as sns
 
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
+dataset = pd.read_csv('creditcard.csv')
 
- # Load the dataset
- data = pd.read_csv(r"Desktop/creditcard.csv")
+X = dataset.drop('Class', axis=1)
+y = dataset['Class']
 
- # Separate features and labels
- X = data.drop('Class', axis=1)
- y = data['Class']
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
 
- # Normalize the feature data
- scaler = StandardScaler()
- X_scaled = scaler.fit_transform(X)
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
 
- # Split into training and testing sets
- X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+X_train_normal = X_train[y_train == 0]
+X_test_normal = X_test[y_test == 0]
+X_test_anomalies = X_test[y_test == 1]
 
- # Filter normal transactions (Class == 0) for training
- X_train_normal = X_train[y_train == 0]
- print(f"Number of normal transactions in training set: 
-{X_train_normal.shape[0]}")
+input_dim = X_train_normal.shape[1]
 
- # Define the Autoencoder model
- input_dim = X_train_normal.shape[1]
- autoencoder = tf.keras.Sequential([
-    tf.keras.layers.Input(shape=(input_dim,)),
-    tf.keras.layers.Dense(32, activation='relu'),   # Encoder layer
-    tf.keras.layers.Dense(16, activation='relu'),   # Encoder layer
-    tf.keras.layers.Dense(8, activation='relu'),    # Latent representation
-    tf.keras.layers.Dense(16, activation='relu'),   # Decoder layer
-    tf.keras.layers.Dense(32, activation='relu'),   # Decoder layer
-    tf.keras.layers.Dense(input_dim, activation='sigmoid') # Output layer
- ])
+encoder=models.Sequential([
+    layers.Input(shape=(input_dim,)),
+    layers.Dense(32,activation="relu"),
+    layers.Dense(16,activation="relu"),
+    layers.Dense(8,activation="relu")
+])
 
- autoencoder.compile(optimizer='adam', loss='mse')
- history = autoencoder.fit(X_train_normal, X_train_normal, epochs=50, batch_size=256, validation_data=(X_test, X_test), shuffle=True)
+decoder=models.Sequential([
+    layers.Input(shape=(8,)),
+    layers.Dense(16,activation="relu"),
+    layers.Dense(32,activation="relu"),
+    layers.Dense(input_dim,activation="linear")
+])
 
- # Visualize training and validation losses
- plt.figure(figsize=(10, 6))
- plt.plot(history.history['loss'], label='Train Loss', color='blue')
- plt.plot(history.history['val_loss'], label='Validation Loss', color='orange')
- plt.title('Training vs Validation Loss')
- plt.xlabel('Epochs')
- plt.ylabel('Loss')
- plt.legend()
- plt.show()
+autoencoder = models.Sequential([encoder, decoder])
+autoencoder.compile(loss="mean_squared_error", optimizer="adam")
 
- # Calculate reconstruction error on the test set
- X_test_predictions = autoencoder.predict(X_test)
- mse = np.mean(np.square(X_test - X_test_predictions), axis=1)
+autoencoder.fit(X_train_normal, X_train_normal, epochs=10, shuffle=True, batch_size=64)
 
- # Set a threshold for anomaly detection
- threshold = np.percentile(mse[y_test == 0], 95)
- print(f"Threshold for anomaly detection: {threshold}")
+y_pred = autoencoder.predict(X_test)
+mse = np.mean(np.power(X_test - y_pred, 2), axis=1)
 
-# Classify anomalies
- y_pred = (mse > threshold).astype(int)
- # Evaluate the model
- print("Classification Report:")
- print(classification_report(y_test, y_pred))
- print("Confusion Matrix:")
- print(confusion_matrix(y_test, y_pred))
+threshold = np.percentile(mse[y_test == 0], 95)
+print("Reconstruction error threshold:", threshold)
 
- # Confusion Matrix Visualization
- conf_matrix = confusion_matrix(y_test, y_pred)
- plt.figure(figsize=(8, 6))
- sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=['Normal', 'Fraud'], yticklabels=['Normal', 'Fraud'])
- plt.title('Confusion Matrix')
- plt.ylabel('True class')
- plt.xlabel('Predicted class')
- plt.show()
+anomalies = mse > threshold
+total_anomalies = np.sum(anomalies)
+print("Total No. of Anomalies Detected:", total_anomalies)
 
- # Visualization of reconstruction error distribution
- plt.figure(figsize=(10, 6))
- plt.hist(mse[y_test == 0], bins=50, alpha=0.6, label='Normal')
- plt.hist(mse[y_test == 1], bins=50, alpha=0.6, label='Fraud')
- plt.axvline(threshold, color='r', linestyle='--', label='Threshold')
- plt.title("Reconstruction Error Distribution")
- plt.xlabel("Reconstruction Error")
- plt.ylabel("Frequency")
- plt.legend()
- plt.show()
+plt.figure(figsize=(12,6))
+plt.plot(mse, label="MSE", marker='o', linestyle='', markersize=3)
+plt.axhline(threshold, label="Threshold", color="red")
+plt.xlabel("Index")
+plt.ylabel("MSE")
+plt.title("Anomaly Detection")
+plt.legend()
+plt.show()
 
- # Show reconstruction error and prediction for a few samples
- sample_indices = [0, 1, 2, 3, 4]
- for index in sample_indices:
-    sample = X_test[index]
-    reconstruction = autoencoder.predict(sample.reshape(1, -1))
-    error = np.mean(np.square(sample - reconstruction))
-    prediction = "Fraud" if error > threshold else "Normal"
-    print(f"Sample {index}:")
-    print(f"  Reconstruction Error: {error}")
-    print(f"  Prediction: {prediction} (Threshold: {threshold})")
+print("Confusion Matrix:")
+conf_matrix = confusion_matrix(y_test, anomalies)
+print(conf_matrix)
+
+print("Classification Report:")
+class_report = classification_report(y_test, anomalies)
+print(class_report)
+
+plt.figure(figsize=(6,4))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', cbar=False, annot_kws={"size": 16})
+plt.xlabel("Predicted Class")
+plt.ylabel("True Class")
+plt.title("Confusion Matrix")
+plt.show()
+
+accuracy = accuracy_score(y_test, anomalies)
+precision = precision_score(y_test, anomalies)
+recall = recall_score(y_test, anomalies)
+
+print(f"Accuracy: {accuracy:.4f}")
+print(f"Precision: {precision:.4f}")
+print(f"Recall: {recall:.4f}")
+
