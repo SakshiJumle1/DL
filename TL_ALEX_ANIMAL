@@ -1,95 +1,101 @@
 import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers, models
 import matplotlib.pyplot as plt
+import numpy as np
+import os
 
-# ==== Dataset directories ====
-train_dir = r"C:\Users\niles\Downloads\cats_and_dogs_filtered\train"
-val_dir = r"C:\Users\niles\Downloads\cats_and_dogs_filtered\validation"
+# 1️⃣ Dataset paths
+train_dir = r"C:\Users\Sakshi\Downloads\cats_and_dogs_filtered\train"
+validation_dir = r"C:\Users\Sakshi\Downloads\cats_and_dogs_filtered\validation"
 
-# ==== Load datasets ====
-img_height, img_width = 227, 227   # AlexNet uses 227x227 input
+# 2️⃣ Image parameters
+img_height, img_width = 227, 227   # AlexNet uses 227×227
 batch_size = 32
 
+# 3️⃣ Load dataset
 train_ds = tf.keras.utils.image_dataset_from_directory(
     train_dir,
     image_size=(img_height, img_width),
-    batch_size=batch_size
+    batch_size=batch_size,
+    shuffle=True
 )
-
 val_ds = tf.keras.utils.image_dataset_from_directory(
-    val_dir,
+    validation_dir,
     image_size=(img_height, img_width),
     batch_size=batch_size
 )
 
-# ✅ Get class names
+# 4️⃣ View class names
 class_names = train_ds.class_names
-print("Classes:", class_names)
+print("Class Names:", class_names)
 
-# ✅ Optimize dataset loading
+# 5️⃣ Optimize pipeline
 AUTOTUNE = tf.data.AUTOTUNE
-train_ds = train_ds.cache().shuffle(1000).prefetch(AUTOTUNE)
-val_ds = val_ds.cache().prefetch(AUTOTUNE)
+train_ds = train_ds.cache().shuffle(1000).prefetch(buffer_size=AUTOTUNE)
+val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
 
-# ==== Build AlexNet ====
-model = models.Sequential([
-    layers.Conv2D(96, (11, 11), strides=4, activation='relu', input_shape=(227, 227, 3)),
-    layers.BatchNormalization(),
-    layers.MaxPooling2D((3, 3), strides=2),
+# 6️⃣ Build AlexNet model
+model = tf.keras.Sequential([
+    tf.keras.layers.Rescaling(1./255, input_shape=(img_height, img_width, 3)),
 
-    layers.Conv2D(256, (5, 5), padding='same', activation='relu'),
-    layers.BatchNormalization(),
-    layers.MaxPooling2D((3, 3), strides=2),
+    # 1st Conv Layer
+    tf.keras.layers.Conv2D(96, (11, 11), strides=4, activation='relu'),
+    tf.keras.layers.MaxPooling2D((3, 3), strides=2),
 
-    layers.Conv2D(384, (3, 3), padding='same', activation='relu'),
-    layers.Conv2D(384, (3, 3), padding='same', activation='relu'),
-    layers.Conv2D(256, (3, 3), padding='same', activation='relu'),
-    layers.MaxPooling2D((3, 3), strides=2),
+    # 2nd Conv Layer
+    tf.keras.layers.Conv2D(256, (5, 5), padding='same', activation='relu'),
+    tf.keras.layers.MaxPooling2D((3, 3), strides=2),
 
-    layers.Flatten(),
-    layers.Dense(4096, activation='relu'),
-    layers.Dropout(0.5),
-    layers.Dense(4096, activation='relu'),
-    layers.Dropout(0.5),
-    layers.Dense(len(class_names), activation='softmax')
+    # 3rd, 4th, 5th Conv Layers
+    tf.keras.layers.Conv2D(384, (3, 3), padding='same', activation='relu'),
+    tf.keras.layers.Conv2D(384, (3, 3), padding='same', activation='relu'),
+    tf.keras.layers.Conv2D(256, (3, 3), padding='same', activation='relu'),
+    tf.keras.layers.MaxPooling2D((3, 3), strides=2),
+
+    # Flatten + Fully Connected Layers
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(4096, activation='relu'),
+    tf.keras.layers.Dropout(0.5),
+    tf.keras.layers.Dense(4096, activation='relu'),
+    tf.keras.layers.Dropout(0.5),
+
+    # Output Layer (binary classification → sigmoid)
+    tf.keras.layers.Dense(1, activation='sigmoid')
 ])
 
-# ==== Compile model ====
+# 7️⃣ Compile
 model.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
-    loss='sparse_categorical_crossentropy',
+    loss='binary_crossentropy',
     metrics=['accuracy']
 )
 
-# ==== Summary ====
+# 8️⃣ Summary
 model.summary()
 
-# ==== Train model ====
-epochs = 10
-history = model.fit(train_ds, validation_data=val_ds, epochs=epochs)
+# 9️⃣ Train
+history = model.fit(
+    train_ds,
+    validation_data=val_ds,
+    epochs=10
+)
 
-# ==== Plot Accuracy ====
-plt.plot(history.history['accuracy'], label='Train Accuracy')
-plt.plot(history.history['val_accuracy'], label='Val Accuracy')
-plt.xlabel("Epochs")
-plt.ylabel("Accuracy")
+# 🔟 Plot accuracy & loss
+acc = history.history['accuracy']
+val_acc = history.history['val_accuracy']
+loss = history.history['loss']
+val_loss = history.history['val_loss']
+epochs = range(1, len(acc) + 1)
+
+plt.figure(figsize=(12,5))
+plt.subplot(1,2,1)
+plt.plot(epochs, acc, 'b', label='Training acc')
+plt.plot(epochs, val_acc, 'r', label='Validation acc')
 plt.legend()
+plt.title("Accuracy")
+
+plt.subplot(1,2,2)
+plt.plot(epochs, loss, 'b', label='Training loss')
+plt.plot(epochs, val_loss, 'r', label='Validation loss')
+plt.legend()
+plt.title("Loss")
 plt.show()
-
-# ==== Evaluate ====
-loss, acc = model.evaluate(val_ds)
-print(f"Validation Accuracy: {acc*100:.2f}%")
-
-# ==== Show Predictions ====
-for images, labels in val_ds.take(1):
-    preds = model.predict(images)
-    pred_labels = tf.argmax(preds, axis=1)
-
-    plt.figure(figsize=(10,10))
-    for i in range(9):
-        plt.subplot(3,3,i+1)
-        plt.imshow(images[i].numpy().astype("uint8"))
-        plt.title(f"Pred: {class_names[pred_labels[i]]}\nTrue: {class_names[labels[i]]}")
-        plt.axis("off")
-    plt.show()
