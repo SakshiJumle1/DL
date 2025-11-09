@@ -1,0 +1,99 @@
+import tensorflow as tf
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+
+# 1️⃣ Give normal paths to your extracted folders
+train_dir = r"Downloads/cats_and_dogs_filtered/cats_and_dogs_filtered/train"
+validation_dir = r"Downloads/cats_and_dogs_filtered/cats_and_dogs_filtered/validation"
+
+# 2️⃣ Set image parameters
+img_height, img_width = 160, 160
+batch_size = 32
+
+# 3️⃣ Load dataset from directories
+train_ds = tf.keras.utils.image_dataset_from_directory(
+    train_dir,
+    image_size=(img_height, img_width),
+    batch_size=batch_size,
+    shuffle=True
+)
+
+val_ds = tf.keras.utils.image_dataset_from_directory(
+    validation_dir,
+    image_size=(img_height, img_width),
+    batch_size=batch_size
+)
+
+# 4️⃣ View class names
+class_names = train_ds.class_names
+print("Class Names:", class_names)
+
+# 5️⃣ Optimize dataset performance
+AUTOTUNE = tf.data.AUTOTUNE
+train_ds = train_ds.cache().shuffle(1000).prefetch(buffer_size=AUTOTUNE)
+val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
+
+# 6️⃣ Load pretrained MobileNetV2 as base model
+base_model = tf.keras.applications.MobileNetV2(
+    input_shape=(img_height, img_width, 3),
+    include_top=False,
+    weights='imagenet'
+)
+base_model.trainable = False  # Freeze pretrained layers
+
+# 7️⃣ Add custom layers
+global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
+prediction_layer = tf.keras.layers.Dense(1, activation='sigmoid')
+
+model = tf.keras.Sequential([
+    tf.keras.layers.Rescaling(1./255),
+    base_model,
+    global_average_layer,
+    prediction_layer
+])
+
+# 8️⃣ Compile the model
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
+    loss='binary_crossentropy',
+    metrics=['accuracy']
+)
+
+# 9️⃣ Train the model
+history = model.fit(
+    train_ds,
+    validation_data=val_ds,
+    epochs=5
+)
+
+# 🔟 Plot accuracy and loss
+acc = history.history['accuracy']
+val_acc = history.history['val_accuracy']
+loss = history.history['loss']
+val_loss = history.history['val_loss']
+epochs = range(1, len(acc) + 1)
+
+plt.figure(figsize=(12,5))
+plt.subplot(1,2,1)
+plt.plot(epochs, acc, 'b', label='Training acc')
+plt.plot(epochs, val_acc, 'r', label='Validation acc')
+plt.legend()
+plt.title("Accuracy")
+
+plt.subplot(1,2,2)
+plt.plot(epochs, loss, 'b', label='Training loss')
+plt.plot(epochs, val_loss, 'r', label='Validation loss')
+plt.legend()
+plt.title("Loss")
+plt.show()
+
+for images, labels in val_ds.take(1):
+    preds = model.predict(images)
+    pred_labels = (preds > 0.5).astype("int32")
+    plt.figure(figsize=(10,10))
+    for i in range(9):
+        ax = plt.subplot(3,3,i+1)
+        plt.imshow(images[i].numpy().astype("uint8"))
+        plt.title(f"Pred: {class_names[pred_labels[i][0]]}\nTrue: {class_names[labels[i]]}")
+        plt.axis("off")
