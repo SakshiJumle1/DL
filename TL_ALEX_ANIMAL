@@ -99,3 +99,18 @@ plt.plot(epochs, val_loss, 'r', label='Validation loss')
 plt.legend()
 plt.title("Loss")
 plt.show()
+
+
+# 🔟 Show predictions on validation images
+for images, labels in val_ds.take(1):
+    preds = model.predict(images)
+    pred_labels = (preds > 0.5).astype("int32")
+
+    plt.figure(figsize=(10,10))
+    for i in range(9):
+        ax = plt.subplot(3,3,i+1)
+        plt.imshow(images[i].numpy().astype("uint8"))
+        plt.title(f"Pred: {class_names[pred_labels[i][0]]}\nTrue: {class_names[labels[i]]}")
+        plt.axis("off")
+    plt.show()
+
