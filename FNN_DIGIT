@@ -52,19 +52,19 @@ plt.show()
 predictions = model.predict(x_test)
 
 import random
-idx = random.randint(0, len(x_test) - 1)  # pick random index
+idx = random.randint(0, len(x_test) - 1) 
 plt.imshow(x_test[idx], cmap='gray')
 plt.title(f"Predicted: {np.argmax(predictions[idx])}")
 plt.axis('off')
 plt.show()
 
-idx = random.randint(0, len(x_test) - 1)  # pick random index
+idx = random.randint(0, len(x_test) - 1)  
 plt.imshow(x_test[idx], cmap='gray')
 plt.title(f"Predicted: {np.argmax(predictions[idx])}")
 plt.axis('off')
 plt.show()
 
-idx = random.randint(0, len(x_test) - 1)  # pick random index
+idx = random.randint(0, len(x_test) - 1) 
 plt.imshow(x_test[idx], cmap='gray')
 plt.title(f"Predicted: {np.argmax(predictions[idx])}")
 plt.axis('off')
