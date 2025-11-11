@@ -5,67 +5,70 @@ from tensorflow.keras.datasets import mnist
 import numpy as np
 import matplotlib.pyplot as plt
 
-# 1. Load Data (We don't need noise)
 (x_train, _), (x_test, _) = mnist.load_data()
 
-# Normalize and Reshape
-x_train = x_train.reshape(-1, 28, 28, 1) / 255.0
-x_test = x_test.reshape(-1, 28, 28, 1) / 255.0
+x_train = x_train.astype('float32') / 255.0
+x_test = x_test.astype('float32') / 255.0
+x_train = x_train.reshape(-1, 28, 28, 1)
+x_test = x_test.reshape(-1, 28, 28, 1)
 
-# 2. Define the Autoencoder Model
+noise_factor = 0.5
+x_train_noisy = x_train + noise_factor * np.random.normal(loc=0.0, scale=1.0, size=x_train.shape)
+x_test_noisy = x_test + noise_factor * np.random.normal(loc=0.0, scale=1.0, size=x_test.shape)
+
+x_train_noisy = np.clip(x_train_noisy, 0., 1.)
+x_test_noisy = np.clip(x_test_noisy, 0., 1.)
+
 input_img = Input(shape=(28, 28, 1))
 
-# Encoder: Compresses 784 pixels -> 128 -> 64
 x = Flatten()(input_img)
 x = Dense(128, activation='relu')(x)
-encoded = Dense(64, activation='relu')(x) # The "compressed" representation
+encoded = Dense(64, activation='relu')(x)
 
-# Decoder: Expands 64 -> 128 -> 784 pixels
 x = Dense(128, activation='relu')(encoded)
 x = Dense(28 * 28, activation='sigmoid')(x)
-decoded = Reshape((28, 28, 1))(x) # The "reconstructed" image
+decoded = Reshape((28, 28, 1))(x)
 
-# Create the model
 autoencoder = Model(input_img, decoded)
-autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
 
-# 3. Train the Model
-# We teach it to turn x_train (original) into x_train (original)
-print("--- Training the simple autoencoder ---")
-autoencoder.fit(
-    x_train, 
-    x_train,  # Note: The input and target are the same
-    epochs=5,
-    batch_size=32,
+autoencoder.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+print("Training the Denoising Autoencoder...")
+history = autoencoder.fit(
+    x_train_noisy, x_train,  # input: noisy images, target: clean images
+    epochs=10,
+    batch_size=128,
     shuffle=True,
-    validation_data=(x_test, x_test),
-    verbose=1
+    validation_data=(x_test_noisy, x_test)
 )
 
-# 4. Get Reconstructed Images
-print("\n--- Reconstructing test images ---")
-reconstructed_images = autoencoder.predict(x_test)
+denoised_images = autoencoder.predict(x_test_noisy)
 
-# 5. Display 10 Original vs. Reconstructed Images
-print("Displaying 10 sample results...")
-n = 10
-plt.figure(figsize=(20, 4)) # 2 rows, 10 columns
+n = 10  
+plt.figure(figsize=(20, 6))
+
 for i in range(n):
-    # Display Original
-    ax = plt.subplot(2, n, i + 1)
+    # Display Noisy image
+    ax = plt.subplot(3, n, i + 1)
+    plt.imshow(x_test_noisy[i].reshape(28, 28), cmap='gray')
+    ax.set_title("Noisy")
+    ax.axis('off')
+
+    # Display Original Clean image
+    ax = plt.subplot(3, n, i + 1 + n)
     plt.imshow(x_test[i].reshape(28, 28), cmap='gray')
     ax.set_title("Original")
-    ax.get_xaxis().set_visible(False)
-    ax.get_yaxis().set_visible(False)
+    ax.axis('off')
 
-    # Display Reconstructed
-    ax = plt.subplot(2, n, i + 1 + n)
-    plt.imshow(reconstructed_images[i].reshape(28, 28), cmap='gray')
-    ax.set_title("Reconstructed")
-    ax.get_xaxis().set_visible(False)
-    ax.get_yaxis().set_visible(False)
+    # Display Denoised (Output) image
+    ax = plt.subplot(3, n, i + 1 + 2*n)
+    plt.imshow(denoised_images[i].reshape(28, 28), cmap='gray')
+    ax.set_title("Denoised")
+    ax.axis('off')
 
 plt.tight_layout()
-plt.savefig('autoencoder_results.png')
-print("Saved comparison image to 'autoencoder_results.png'")
 plt.show()
+
+loss, accuracy = autoencoder.evaluate(x_test_noisy, x_test)
+print(f"\nFinal Test Loss: {loss:.4f}")
+print(f"Final Test Accuracy: {accuracy * 100:.2f}%")
