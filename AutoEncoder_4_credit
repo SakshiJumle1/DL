@@ -9,7 +9,7 @@ from tensorflow.keras import layers, models
 from sklearn.preprocessing import StandardScaler
 import seaborn as sns
 
-dataset = pd.read_csv('creditcard.csv')
+dataset = pd.read_csv('Downloads/Credit Card Dataset-20221031T095748Z-001/Credit Card Dataset/creditcard.csv')
 
 X = dataset.drop('Class', axis=1)
 y = dataset['Class']
@@ -85,4 +85,3 @@ recall = recall_score(y_test, anomalies)
 print(f"Accuracy: {accuracy:.4f}")
 print(f"Precision: {precision:.4f}")
 print(f"Recall: {recall:.4f}")
-
