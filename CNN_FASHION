@@ -5,18 +5,15 @@ from tensorflow.keras.datasets import fashion_mnist
 import numpy as np
 import matplotlib.pyplot as plt
 
-# 1. Load and Preprocess the Fashion MNIST Dataset
 (x_train, y_train), (x_test, y_test) = fashion_mnist.load_data()
 
-# Normalize and Reshape data for the CNN
 x_train = x_train.reshape(-1, 28, 28, 1) / 255.0
 x_test = x_test.reshape(-1, 28, 28, 1) / 255.0
 
-# Define the class names
 class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
                'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
 
-# 2. Define the CNN Model Architecture
+
 model = Sequential([
     Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1)),
     MaxPooling2D((2, 2)),
@@ -27,14 +24,14 @@ model = Sequential([
     Dense(10, activation='softmax')
 ])
 
-# 3. Compile the Model
+
 model.compile(
     optimizer='adam',
     loss='sparse_categorical_crossentropy',
     metrics=['accuracy']
 )
 
-# 4. Train the Model
+
 print("--- Training the model ---")
 # Store the training history to plot graphs
 history = model.fit(
@@ -45,12 +42,10 @@ history = model.fit(
     verbose=1
 )
 
-# 5. Evaluate the Model's Overall Accuracy
 print("\n--- Evaluating on test data ---")
 test_loss, test_acc = model.evaluate(x_test, y_test, verbose=2)
 print(f"\nOverall Test accuracy: {test_acc*100:.2f}%")
 
-# 6. Plot the Simple Accuracy Graph
 print("\n--- Plotting training history ---")
 plt.figure(figsize=(8, 5))
 plt.plot(history.history['accuracy'], label='Training Accuracy')
@@ -62,22 +57,18 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
-# 7. Test and Display 5 Sample Predictions
 print("\n--- Displaying individual predictions ---")
 
 predictions = model.predict(x_test[:5])
 predicted_labels = np.argmax(predictions, axis=1)
 actual_labels = y_test[:5]
 
-# Set up a 1x5 grid to display the images
 plt.figure(figsize=(10, 3))
 for i in range(5):
     plt.subplot(1, 5, i + 1)
-    
-    # Display the image (reshape to 28x28)
     plt.imshow(x_test[i].reshape(28, 28), cmap='gray')
     
-    # Set the title with prediction and actual label
+
     pred_name = class_names[predicted_labels[i]]
     actual_name = class_names[actual_labels[i]]
     plt.title(f"Pred: {pred_name}\nActual: {actual_name}")
